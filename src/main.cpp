@@ -28,6 +28,16 @@
 using namespace Gdiplus;
 
 // ---------------------------------------------------------------- palette
+#ifndef PK_VERSION
+#define PK_VERSION "0.0.0"
+#endif
+
+static std::wstring VerW() {
+    std::wstring w;
+    for (const char* p = PK_VERSION; *p; ++p) w.push_back((wchar_t)(unsigned char)*p);
+    return w;
+}
+
 // Monochrome: every colour collapses to its luminance, so the UI is pure black/white.
 #define RGBCOL(r, g, b) Color(255, (BYTE)(((r) * 30 + (g) * 59 + (b) * 11) / 100),                                   (BYTE)(((r) * 30 + (g) * 59 + (b) * 11) / 100),                                   (BYTE)(((r) * 30 + (g) * 59 + (b) * 11) / 100))
 static const Color kBg = RGBCOL(10, 10, 10);
@@ -685,10 +695,10 @@ static void DrawStatus(Graphics& g, const RECT& rc) {
         }
     }
 
-    std::wstring right = L"F5 refresh    Del kill    Ctrl+C copy    Ctrl+F filter";
+    std::wstring right = L"v" + VerW() + L"    F5 refresh    Del kill    Ctrl+C copy";
     RECT rcRight = rc;
     rcRight.right -= S(14);
-    rcRight.left = rcRight.right - S(420);
+    rcRight.left = rcRight.right - S(430);
     if (rcRight.left > rcLeft.left + S(300)) {
         RECT measured = rcRight;
         StringFormat fmtR;
@@ -1546,6 +1556,16 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int showCmd) {
     if (wcsstr(GetCommandLineW(), L"--selftest")) {
         AttachConsole(ATTACH_PARENT_PROCESS);
         return SelfTest();
+    }
+    if (wcsstr(GetCommandLineW(), L"--version")) {
+        AttachConsole(ATTACH_PARENT_PROCESS);
+        HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (out && out != INVALID_HANDLE_VALUE) {
+            DWORD wrote = 0;
+            std::string line = std::string("PortKiller ") + PK_VERSION + "\r\n";
+            WriteFile(out, line.data(), (DWORD)line.size(), &wrote, nullptr);
+        }
+        return 0;
     }
     g_inst = inst;
     g_dpi = GetDpiForSystem();
