@@ -1,37 +1,53 @@
-# Windows Port Killer
+# Port Killer
 
-Native Win32 port inspector. Shows every TCP/UDP endpoint on the machine and kills the process
-holding one. Single self-contained `.exe`, no Python, no runtime, no installer.
+Native Win32 port inspector for Windows. Lists every TCP and UDP endpoint on the machine and kills
+the process holding one. A single self-contained `PortKiller.exe` — no Python, no installer, no runtime,
+no redistributable.
 
-![Windows](https://img.shields.io/badge/platform-Windows%2010%2F11-blue)
+[![ci](https://github.com/SlasshyOverhere/windows-port-killer/actions/workflows/ci.yml/badge.svg)](https://github.com/SlasshyOverhere/windows-port-killer/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/SlasshyOverhere/windows-port-killer)](https://github.com/SlasshyOverhere/windows-port-killer/releases/latest)
+![platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-blue)
 ![C++](https://img.shields.io/badge/C%2B%2B17-Win32%20%2B%20GDI%2B-informational)
-![License](https://img.shields.io/badge/license-MIT-orange)
+![license](https://img.shields.io/github/license/SlasshyOverhere/windows-port-killer)
+
+## Download
+
+Grab `PortKiller-win-x64.zip` from the [latest release](https://github.com/SlasshyOverhere/windows-port-killer/releases/latest),
+verify it against `SHA256SUMS.txt`, unzip anywhere and run `PortKiller.exe`. No admin rights required:
+elevation is offered in-app for kills that Windows denies to a standard user.
 
 ## Why it is fast
 
-- Reads the socket table straight from the IP Helper API (`GetExtendedTcpTable` / `GetExtendedUdpTable`)
+- Socket table is read straight from the IP Helper API (`GetExtendedTcpTable` / `GetExtendedUdpTable`)
   in-process. No `netstat`, no `tasklist`, no subprocess spawn, no console flashing.
-- One pass resolves every PID to name/path/working-set through `CreateToolhelp32Snapshot` + `OpenProcess`.
+- One pass resolves every PID to name, path and working set through `CreateToolhelp32Snapshot` + `OpenProcess`.
 - Virtual-mode ListView (`LVS_OWNERDATA`): painting cost depends on visible rows, not table size.
-- Typical full refresh: **~15 ms** for 250+ endpoints and 340 processes.
+- Typical full refresh: **~12-15 ms** for 250+ endpoints and 340 processes.
 
 ## Features
 
-- **All endpoints** — IPv4 + IPv6 TCP and UDP, with real listening state and owning PID.
+- **All endpoints** — IPv4 + IPv6, TCP and UDP, with real listening state and owning PID.
 - **Live search** — one box matching port, address, state, PID, process name or path; instant, no re-scan.
-- **Protocol filter** — All / TCP / UDP / Listening-only toggle chips.
-- **Sort** — click any column, click again to reverse; sort survives refresh.
-- **Kill** — kills a single PID or the whole process tree, with a confirmation showing what dies.
+- **Filters** — All / TCP / UDP / Listening-only toggle chips.
+- **Sort** — click any column, click again to reverse; the sort survives refresh.
+- **Kill** — one PID or the whole process tree, with a confirmation naming what will die.
 - **Details panel** — full command path, working set, endpoint counts, elevation state.
-- **Copy** — port, PID, `PID 1234 (name)`, `localhost:3000`, or the whole row, from the right-click menu.
-- **Open** — launch the process's port in the browser, or jump to the executable in Explorer.
+- **Copy** — port, PID, `PID 1234 (name)`, `localhost:3000`, or the whole row, from the context menu.
+- **Open** — launch the process's port in the browser, or reveal the executable in Explorer.
 - **Export** — CSV of the current filtered view.
-- **Elevation** — one click (`Ctrl+E`) re-launches as administrator via UAC when a kill is denied.
-- **Auto-refresh** — 2 s timer, toggled with `Ctrl+R`.
-- **Monochrome UI** — pure black/white/gray palette, no hue anywhere: owner-drawn buttons, rows and
-  headers painted with GDI+ grayscale anti-aliasing, zebra striping, white selected states.
-- **Compact window** — opens at 1040x660 and resizes down to 780x430; DPI-aware (per-monitor v2),
-  custom icon, remembered geometry (stale geometry from older layouts is discarded once).
+- **Elevation** — one click re-launches as administrator through UAC when a kill is denied.
+- **Auto-refresh** — 2 s timer.
+- **Monochrome UI** — pure black/white/gray palette with no hue anywhere: owner-drawn buttons, rows and
+  headers painted through GDI+ grayscale anti-aliasing, zebra striping, white selected states.
+- **Compact window** — opens at 1040x660 and resizes down to 780x430; DPI-aware (per-monitor v2), custom
+  icon, remembered window geometry (geometry saved by older layouts is discarded once).
+
+## Command line
+
+| Flag | Effect |
+| --- | --- |
+| `--version` | print the version and exit |
+| `--selftest` | run the built-in enumeration/format/sort self-check, exit 0 on pass |
 
 ## Keyboard
 
@@ -40,51 +56,73 @@ holding one. Single self-contained `.exe`, no Python, no runtime, no installer.
 | `Ctrl+F` / `Ctrl+L` | focus search |
 | `Esc` | clear search |
 | `F5` | refresh |
-| `Ctrl+R` | toggle auto-refresh |
-| `Ctrl+K` / `Del` | kill selection (tree: `Ctrl+Shift+K`) |
-| `Ctrl+C` | copy port |
+| `Ctrl+R` | refresh (with `Shift`: toggle auto-refresh) |
+| `Ctrl+K` | kill selected process (`Ctrl+Shift+K`: kill its tree) |
 | `Ctrl+D` | details |
-| `Ctrl+E` | elevate |
-| `Ctrl+A` | select all |
-| `Enter` / double-click | details |
+| `Ctrl+E` | export CSV |
+| `Ctrl+C` | copy selection |
+| `Ctrl+A` | select all rows |
+| `Enter` | details |
+| `Del` | kill selected process |
 
-## Build
+## Build from source
 
-Needs Visual Studio 2022 (Build Tools are enough) with the C++ workload and a Windows 10/11 SDK.
+Requirements: Visual Studio 2022 (Desktop C++ workload) and CMake 3.20+.
 
 ```bat
 build.bat
 ```
 
-or manually:
+`build.bat` enters the x64 developer prompt and drives CMake + Ninja; the exe lands at
+`build\PortKiller.exe`. Manual equivalent:
 
 ```bat
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -S . -B build
-cmake --build build
+cmake -S . -B build -A x64
+cmake --build build --config Release --parallel
 ```
 
-Output: `build\PortKiller.exe`. Static CRT, no manifest or VC++ redistributable required.
-
-## Verify
+Verify a build before shipping it:
 
 ```bat
+build\PortKiller.exe --version
 build\PortKiller.exe --selftest
+powershell -File tools\check_ui.ps1
 ```
 
-Runs the enumeration and comparator against live OS data and prints
-`RESULT PASS` / `RESULT FAIL` plus counts and scan time (exit code 0/1). Useful in CI or after changes.
+`tools\check_ui.ps1` launches the app, screenshots it into `tools\ui-shot.png` and asserts the palette is
+monochrome (no pixel with more than 20 levels of channel spread), printing a coarse luminance ASCII rendering
+of the window so layout regressions are visible without an image viewer.
+
+## Versioning and releases
+
+`version.txt` is the single source of truth. It is read by CMake at configure time, compiled into
+`--version`, the status bar and the executable's `VERSIONINFO` resource, so nothing can drift.
+
+- **CI** (`.github/workflows/ci.yml`) — on every push to `main` and every pull request: configure, build,
+  run `--selftest`, upload the exe artifact.
+- **Release** (`.github/workflows/release.yml`) — either
+  - *Actions → release → Run workflow* and pick `patch` / `minor` / `major`: the workflow bumps `version.txt`,
+    commits `chore(release): vX.Y.Z`, tags it, pushes, builds, tests and publishes the release, or
+  - push a tag yourself: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+
+  Either way the release carries `PortKiller-X.Y.Z-win-x64.zip` (exe + this README + LICENSE) and
+  `SHA256SUMS.txt`, with notes generated from the commits since the previous tag.
 
 ## Layout
 
 ```
-src/ports.{h,cpp}   IP Helper enumeration, toolhelp process map, RFC 5952 IPv6 formatting,
-                    kill / child-tree walk / privilege helpers
-src/main.cpp        window, painting (GDI+), virtual ListView, filtering, sorting, actions
-src/app.rc          icon, version info
-src/app.manifest    comctl32 v6, per-monitor v2 DPI, UTF-8 code page
-tools/make_icon.js  regenerates src/app.ico and the preview PNG
+CMakeLists.txt        static-CRT WIN32 target, version plumbing
+build.bat             one-shot local release build
+version.txt           single source of truth for the version
+src/ports.h|.cpp      IP Helper enumeration, process map, kill helpers
+src/main.cpp          window, GDI+ painting, virtual ListView, filters, actions
+src/app.rc|.manifest  icon + VERSIONINFO, comctl32 v6, per-monitor DPI, UTF-8
+src/resource.h        resource ids
+tools/make_icon.js    regenerates src/app.ico from code (no binary asset by hand)
+tools/check_ui.ps1    launch + monochrome/size smoke check
+.github/workflows/    ci.yml, release.yml
 ```
 
-Settings persist under `HKCU\Software\PortKiller`.
+## License
 
-`port_killer.py` is the original Python/tkinter version, kept for reference only.
+MIT — see [LICENSE](LICENSE).

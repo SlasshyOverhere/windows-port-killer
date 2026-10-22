@@ -14,7 +14,8 @@ public class W {
 '@
 
 Remove-Item -Path 'HKCU:\Software\PortKiller' -Recurse -ErrorAction SilentlyContinue
-$p = Start-Process -FilePath 'C:\Users\suman\.t3\worktrees\windows-port-killer\t3-2e8e4a58\build\PortKiller.exe' -PassThru
+$exe = Join-Path $PSScriptRoot '..\build\PortKiller.exe'
+$p = Start-Process -FilePath $exe -PassThru
 Start-Sleep -Seconds 3
 $p.Refresh()
 $h = $p.MainWindowHandle
@@ -32,7 +33,7 @@ $hdc = $g.GetHdc()
 [void][W2]::PrintWindow($h, $hdc, 2)
 $g.ReleaseHdc($hdc)
 $g.Dispose()
-$bmp.Save('C:\Users\suman\.t3\worktrees\windows-port-killer\t3-2e8e4a58\tools\ui-shot.png', [System.Drawing.Imaging.ImageFormat]::Png)
+$bmp.Save((Join-Path $PSScriptRoot 'ui-shot.png'), [System.Drawing.Imaging.ImageFormat]::Png)
 
 $maxSpread = 0; $sum = 0; $n = 0; $white = 0; $dark = 0; $colored = 0
 for ($y = 0; $y -lt $ht; $y += 3) {

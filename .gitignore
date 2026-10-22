@@ -1,18 +1,16 @@
-# Build files
+# build output
 build/
 dist/
-*.spec
+stage/
+*.zip
+*.log
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-*.egg-info/
-.eggs/
+# local artifacts
+tools/ui-shot.png
+*.user
 
 # IDE
+.vs/
 .vscode/
 .idea/
 *.swp

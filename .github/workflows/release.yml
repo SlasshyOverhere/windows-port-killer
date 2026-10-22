@@ -1,0 +1,105 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve version
+        id: v
+        shell: pwsh
+        run: |
+          if ('${{ github.event_name }}' -eq 'push') {
+            $tag = '${{ github.ref_name }}'
+            $ver = $tag.TrimStart('v')
+          } else {
+            $ver = (Get-Content version.txt -Raw).Trim()
+            $parts = $ver.Split('.')
+            $maj = [int]$parts[0]; $min = [int]$parts[1]; $pat = [int]$parts[2]
+            switch ('${{ inputs.bump }}') {
+              'major' { $maj++; $min = 0; $pat = 0 }
+              'minor' { $min++; $pat = 0 }
+              default { $pat++ }
+            }
+            $ver = "$maj.$min.$pat"
+            $tag = "v$ver"
+            Set-Content version.txt "$ver`n" -NoNewline
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -am "chore(release): $tag" | Out-Null
+            git tag $tag
+            git push origin "HEAD:${{ github.ref_name }}"
+            git push origin $tag
+          }
+          "version=$ver" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+
+      - name: Configure
+        run: cmake -S . -B build -A x64
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Self-test
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath build/Release/PortKiller.exe -ArgumentList '--selftest' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "selftest failed with exit code $($p.ExitCode)" }
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $ver = '${{ steps.v.outputs.version }}'
+          $stage = "stage/PortKiller-$ver-win-x64"
+          New-Item -ItemType Directory -Force $stage, dist | Out-Null
+          Copy-Item 'build/Release/PortKiller.exe', 'README.md', 'LICENSE' -Destination $stage
+          $zip = "dist/PortKiller-$ver-win-x64.zip"
+          Compress-Archive -Path "$stage/*" -DestinationPath $zip -Force
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  $(Split-Path -Leaf $zip)" | Set-Content 'dist/SHA256SUMS.txt' -Encoding ascii
+          Get-ChildItem dist | Select-Object Name, Length | Format-Table
+
+      - name: Publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = '${{ steps.v.outputs.tag }}'
+          $ver = '${{ steps.v.outputs.version }}'
+          $prev = git describe --tags --abbrev=0 'HEAD^' 2>$null
+          $notes = if ($prev) { git log --pretty=format:'- %s' "$prev..HEAD" } else { git log --pretty=format:'- %s' -n 20 }
+          $body = (@(
+            'Single self-contained PortKiller.exe for Windows 10/11 x64. Static CRT: no installer, no runtime, no admin rights needed (elevation is offered in-app for kills that require it).'
+            ''
+            ('Download **PortKiller-' + $ver + '-win-x64.zip**, unzip anywhere, run PortKiller.exe. Verify with SHA256SUMS.txt.')
+            ''
+            '**Changes**'
+            $notes
+          ) -join "`n")
+          gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --repo $env:GITHUB_REPOSITORY --title "Port Killer $ver" --notes $body
+          }
+          gh release upload $tag (Get-ChildItem dist -File).FullName --repo $env:GITHUB_REPOSITORY --clobber
