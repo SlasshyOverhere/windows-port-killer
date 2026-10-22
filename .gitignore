@@ -6,7 +6,6 @@ stage/
 *.log
 
 # local artifacts
-tools/ui-shot.png
 *.user
 
 # IDE

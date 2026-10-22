@@ -86,12 +86,7 @@ Verify a build before shipping it:
 ```bat
 build\PortKiller.exe --version
 build\PortKiller.exe --selftest
-powershell -File tools\check_ui.ps1
 ```
-
-`tools\check_ui.ps1` launches the app, screenshots it into `tools\ui-shot.png` and asserts the palette is
-monochrome (no pixel with more than 20 levels of channel spread), printing a coarse luminance ASCII rendering
-of the window so layout regressions are visible without an image viewer.
 
 ## Versioning and releases
 
@@ -118,8 +113,6 @@ src/ports.h|.cpp      IP Helper enumeration, process map, kill helpers
 src/main.cpp          window, GDI+ painting, virtual ListView, filters, actions
 src/app.rc|.manifest  icon + VERSIONINFO, comctl32 v6, per-monitor DPI, UTF-8
 src/resource.h        resource ids
-tools/make_icon.js    regenerates src/app.ico from code (no binary asset by hand)
-tools/check_ui.ps1    launch + monochrome/size smoke check
 .github/workflows/    ci.yml, release.yml
 ```
 
